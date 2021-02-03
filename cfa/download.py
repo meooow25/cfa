@@ -62,6 +62,7 @@ def users():
                 friend_of_count=u['friendOfCount'],
             ))
 
+    print('{} new users, {} existing users'.format(len(to_insert), len(to_update)))
     with models.db.atomic():
         for piece in chunked(to_insert, 10000):
             User.insert_many(piece).execute()
@@ -289,50 +290,72 @@ def rating_changes():
 
 def submissions():
     # for efficiency
-    user_map = {u.handle: u for u in User.select()}
+    user_map = {u.handle: u.id for u in User.select()}
 
     for c in Contest.select().order_by(Contest.id.desc()):
         if Submission.select().where(Submission.contest == c).exists():
             continue
 
         print('contest', c.id, c.name)
-        try:
-            subs = api_get('contest.status?contestId=%s' % c.id)
-        except Exception as e:
-            print(e)
-            print()
-            continue
-        print('got resp')
+        # The amount of submission for many contests are huge enough to eat up ~2GB of memory and
+        # make the program crash.
+        # Try in batches
 
-        data = []
-        for s in subs:
-            party = s['author']
-            if len(party['members']) != 1:
-                continue # skip teams and ghosts
-            handle = party['members'][0]['handle']
-            try:
-                author = user_map[handle]
-            except KeyError:
-                continue # not rated user
-            typ = ParticipantType[party['participantType']]
-            data.append((
-                s['id'],
-                c,
-                ContestProblem.get(
-                    ContestProblem.contest == c,
-                    ContestProblem.index == s['problem']['index']),
-                author,
-                typ.value,
-                s['programmingLanguage'],
-                Submission.Verdict[s['verdict']].value,
-                s['testset'],
-                s['passedTestCount'],
-            ))
-
-        rc = 0
         with models.db.atomic():
-            for piece in chunked(data, 20000):
-                rc += Submission.insert_many(piece, fields=[
+            batch_size = 20000
+            done = 0
+            last_ids = set()
+            while True:
+                try:
+                    subs = api_get('contest.status?contestId=%s&from=%d&count=%d' % (c.id, done + 1, batch_size))
+                except Exception as e:
+                    stre = str(e)
+                    if 'not found' in stre or 'not started' in stre:
+                        print(e)
+                        break
+                    raise e
+
+                print(f'got {len(subs)} from {done}')
+
+                repeated = unrated_author = team_or_ghost = 0
+                cur_ids = set()
+                data = []
+                for s in subs:
+                    id_ = s['id']
+                    cur_ids.add(id_)
+                    if id_ in last_ids:
+                        repeated += 1
+                        continue
+
+                    party = s['author']
+                    if len(party['members']) != 1:
+                        team_or_ghost += 1
+                        continue # skip teams and ghosts
+                    handle = party['members'][0]['handle']
+                    try:
+                        author_id = user_map[handle]
+                    except KeyError:
+                        unrated_author += 1
+                        continue # not rated user
+
+                    typ = ParticipantType[party['participantType']]
+                    data.append((
+                        id_,
+                        c,
+                        ContestProblem.get(
+                            ContestProblem.contest == c,
+                            ContestProblem.index == s['problem']['index']),
+                        author_id,
+                        typ.value,
+                        s['programmingLanguage'],
+                        Submission.Verdict[s['verdict']].value,
+                        Submission.TestSet[s['testset']].value,
+                        s['passedTestCount'],
+                        s['timeConsumedMillis'],
+                        s['memoryConsumedBytes'],
+                    ))
+
+                rc = Submission.insert_many(data, fields=[
                     Submission.id,
                     Submission.contest,
                     Submission.problem,
@@ -342,6 +365,14 @@ def submissions():
                     Submission.verdict,
                     Submission.testset,
                     Submission.passed_test_count,
-                ]).execute()
-        print(rc, 'submissions of', len(subs))
-        print('')
+                    Submission.time_consumed_millis,
+                    Submission.memory_consumed_bytes,
+                 ]).execute()
+                print(rc, 'submissions', repeated, 'repeated', unrated_author, 'unrated', team_or_ghost, 'team')
+
+                if len(subs) < batch_size:
+                    break
+                done += len(subs)
+                last_ids = cur_ids
+
+        print()

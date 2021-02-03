@@ -72,8 +72,26 @@ class Submission(BaseModel):
     type = IntegerField()  # ParticipationType
     programming_language = CharField(max_length=32)
     verdict = IntegerField()
-    testset = CharField(max_length=32)
+    testset = IntegerField()
     passed_test_count = IntegerField()
+    time_consumed_millis = IntegerField()
+    memory_consumed_bytes = IntegerField()
+
+    class TestSet(Enum):
+        SAMPLES = 1
+        PRETESTS = 2
+        TESTS = 3
+        CHALLENGES = 4
+        TESTS1 = 5
+        TESTS2 = 6
+        TESTS3 = 7
+        TESTS4 = 8
+        TESTS5 = 9
+        TESTS6 = 10
+        TESTS7 = 11
+        TESTS8 = 12
+        TESTS9 = 13
+        TESTS10 = 14
 
     class Verdict(Enum):
         FAILED = 1
