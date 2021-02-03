@@ -22,6 +22,7 @@ def api_get(path):
     j = r.json()
     last = time.time()
     if 'result' in j:
+        assert r.headers['Content-Encoding'] == 'gzip', r.headers['Content-Encoding']
         return j['result']
     raise Exception(j)
 
