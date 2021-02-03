@@ -36,41 +36,21 @@ def users():
     user_list = api_get('user.ratedList?activeOnly=false')
     print(len(user_list), 'rated users')
 
-    to_insert, to_update = [], []
-    for u in user_list:
-        try:
-            user = User.get(User.handle == u['handle'])
-            user.contribution = u['contribution']
-            user.rank = u['rank']
-            user.rating = u['rating']
-            user.max_rank = u['maxRank']
-            user.max_rating = u['maxRating']
-            user.last_online_time = dt.datetime.utcfromtimestamp(u['lastOnlineTimeSeconds'])
-            user.registration_time = dt.datetime.utcfromtimestamp(u['registrationTimeSeconds'])
-            user.friend_of_count = u['friendOfCount']
-            to_update.append(user)
-        except User.DoesNotExist:
-            to_insert.append(dict(
-                handle=u['handle'],
-                contribution=u['contribution'],
-                rank=u['rank'],
-                rating=u['rating'],
-                max_rank=u['maxRank'],
-                max_rating=u['maxRating'],
-                last_online_time=dt.datetime.utcfromtimestamp(u['lastOnlineTimeSeconds']),
-                registration_time=dt.datetime.utcfromtimestamp(u['registrationTimeSeconds']),
-                friend_of_count=u['friendOfCount'],
-            ))
+    to_insert = ((
+        u['handle'],
+        u['contribution'],
+        User.Rank.from_api_string(u['rank']).value,
+        u['rating'],
+        User.Rank.from_api_string(u['maxRank']).value,
+        u['maxRating'],
+        dt.datetime.utcfromtimestamp(u['lastOnlineTimeSeconds']),
+        dt.datetime.utcfromtimestamp(u['registrationTimeSeconds']),
+        u['friendOfCount'],
+    ) for u in user_list)
 
-    print('{} new users, {} existing users'.format(len(to_insert), len(to_update)))
     with models.db.atomic():
-        for piece in chunked(to_insert, 10000):
-            User.insert_many(piece).execute()
-        User.bulk_update(
-            to_update,
-            [User.contribution, User.rank, User.rating, User.max_rank, User.max_rating,
-                User.last_online_time, User.registration_time, User.friend_of_count],
-            batch_size=10000)
+        for chunk in chunked(to_insert, 20000):
+            User.insert_many(chunk).execute()
 
     print(User.select().count(), 'users in db')
 
@@ -84,7 +64,7 @@ def contests():
             name=c['name'],
             start_time=dt.datetime.utcfromtimestamp(c['startTimeSeconds']),
         ))
-    Contest.insert_many(data).on_conflict_ignore().execute()
+    Contest.insert_many(data).execute()
 
     print(Contest.select().count(), 'contests in db')
 
@@ -193,8 +173,8 @@ def standings():
             print(rc, 'ranklist rows')
 
             rc = 0
-            for piece in chunked(data_pr, 10000):
-                rc += ProblemResult.insert_many(piece).execute()
+            for chunk in chunked(data_pr, 10000):
+                rc += ProblemResult.insert_many(chunk).execute()
             print(rc, 'problem result rows')
 
             print('')
@@ -365,19 +345,7 @@ def submissions():
 
                 rc = 0
                 for chunk in chunked(data, 20000):
-                    rc += Submission.insert_many(chunk, fields=[
-                        Submission.id,
-                        Submission.contest,
-                        Submission.problem,
-                        Submission.author,
-                        Submission.type,
-                        Submission.programming_language,
-                        Submission.verdict,
-                        Submission.testset,
-                        Submission.passed_test_count,
-                        Submission.time_consumed_millis,
-                        Submission.memory_consumed_bytes,
-                    ]).execute()
+                    rc += Submission.insert_many(chunk).execute()
                 print(rc, 'submissions', repeated, 'repeated', unrated_author, 'unrated', team, 'team', ghost, 'ghost')
 
                 if len(subs) < batch_size:

@@ -26,14 +26,30 @@ class ParticipantType(Enum):
 class User(BaseModel):
     handle = CharField(unique=True, max_length=32)
     contribution = IntegerField()
-    rank = CharField(max_length=32)
+    rank = IntegerField()  # Rank
     rating = IntegerField()
-    max_rank = CharField(max_length=32)
+    max_rank = IntegerField()  # Rank
     max_rating = IntegerField()
     last_online_time = DateTimeField()
     registration_time = DateTimeField()
     friend_of_count = IntegerField()
 
+    class Rank(Enum):
+        LEGENDARY_GRANDMASTER = 1
+        INTERNATIONAL_GRANDMASTER = 2
+        GRANDMASTER = 3
+        INTERNATIONAL_MASTER = 4
+        MASTER = 5
+        CANDIDATE_MASTER = 6
+        EXPERT = 7
+        SPECIALIST = 8
+        PUPIL = 9
+        NEWBIE = 10
+
+        @classmethod
+        def from_api_string(cls, s: str):
+            name = s.upper().replace(' ', '_')
+            return cls[name]
 
 class Contest(BaseModel):
     id = IntegerField(primary_key=True)
