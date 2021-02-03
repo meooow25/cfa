@@ -289,8 +289,13 @@ def rating_changes():
 
 
 def submissions():
+    # TODO: There's a memory leak here, figure out what's going on
+
     # for efficiency
     user_map = {u.handle: u.id for u in User.select()}
+    problem_map = {(p.contest_id, p.index): p.id for p in ContestProblem.select()}
+
+    batch_size = 100_000
 
     for c in Contest.select().order_by(Contest.id.desc()):
         if Submission.select().where(Submission.contest == c).exists():
@@ -302,7 +307,6 @@ def submissions():
         # Try in batches
 
         with models.db.atomic():
-            batch_size = 20000
             done = 0
             last_ids = set()
             while True:
@@ -317,7 +321,7 @@ def submissions():
 
                 print(f'got {len(subs)} from {done}')
 
-                repeated = unrated_author = team_or_ghost = 0
+                repeated = unrated_author = team = ghost = 0
                 cur_ids = set()
                 data = []
                 for s in subs:
@@ -328,9 +332,13 @@ def submissions():
                         continue
 
                     party = s['author']
-                    if len(party['members']) != 1:
-                        team_or_ghost += 1
-                        continue # skip teams and ghosts
+                    if len(party['members']) == 0:
+                        ghost += 1
+                        continue
+                    if len(party['members']) > 1:
+                        team += 1
+                        continue
+
                     handle = party['members'][0]['handle']
                     try:
                         author_id = user_map[handle]
@@ -338,13 +346,13 @@ def submissions():
                         unrated_author += 1
                         continue # not rated user
 
+                    problem_id = problem_map[(c.id, s['problem']['index'])]
                     typ = ParticipantType[party['participantType']]
+
                     data.append((
                         id_,
-                        c,
-                        ContestProblem.get(
-                            ContestProblem.contest == c,
-                            ContestProblem.index == s['problem']['index']),
+                        c.id,
+                        problem_id,
                         author_id,
                         typ.value,
                         s['programmingLanguage'],
@@ -355,20 +363,22 @@ def submissions():
                         s['memoryConsumedBytes'],
                     ))
 
-                rc = Submission.insert_many(data, fields=[
-                    Submission.id,
-                    Submission.contest,
-                    Submission.problem,
-                    Submission.author,
-                    Submission.type,
-                    Submission.programming_language,
-                    Submission.verdict,
-                    Submission.testset,
-                    Submission.passed_test_count,
-                    Submission.time_consumed_millis,
-                    Submission.memory_consumed_bytes,
-                 ]).execute()
-                print(rc, 'submissions', repeated, 'repeated', unrated_author, 'unrated', team_or_ghost, 'team')
+                rc = 0
+                for chunk in chunked(data, 20000):
+                    rc += Submission.insert_many(chunk, fields=[
+                        Submission.id,
+                        Submission.contest,
+                        Submission.problem,
+                        Submission.author,
+                        Submission.type,
+                        Submission.programming_language,
+                        Submission.verdict,
+                        Submission.testset,
+                        Submission.passed_test_count,
+                        Submission.time_consumed_millis,
+                        Submission.memory_consumed_bytes,
+                    ]).execute()
+                print(rc, 'submissions', repeated, 'repeated', unrated_author, 'unrated', team, 'team', ghost, 'ghost')
 
                 if len(subs) < batch_size:
                     break
