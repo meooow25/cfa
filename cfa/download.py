@@ -312,6 +312,10 @@ def submissions():
                         repeated += 1
                         continue
 
+                    if 'verdict' not in s:
+                        print('no verdict', s)
+                        continue
+
                     party = s['author']
                     if len(party['members']) == 0:
                         ghost += 1
