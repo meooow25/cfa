@@ -50,6 +50,10 @@ class User(BaseModel):
         def from_api_string(cls, s: str):
             name = s.upper().replace(' ', '_')
             return cls[name]
+        
+        @property
+        def title(self):
+            return self.name.replace('_', ' ').title()
 
 class Contest(BaseModel):
     id = IntegerField(primary_key=True)

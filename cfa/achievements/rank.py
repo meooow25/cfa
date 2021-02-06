@@ -3,28 +3,16 @@ from dataclasses import dataclass
 from ..achievement import Grant, register
 from ..models import User, RatingChange
 
-def register_rank(rank):
+def register_rank(rank: User.Rank):
+    rank_title = rank.title
     @register(
-        title=rank,
-        brief="I'm a " + rank,
-        description='Have rank ' + rank)
+        title=rank_title,
+        brief="I'm a " + rank_title,
+        description='Have rank ' + rank_title)
     def func():
-        users = User.select().where(User.rank == rank.lower())
-        grants = [Grant(user.handle, rank) for user in users]
+        users = User.select().where(User.rank == rank.value)
+        grants = [Grant(user.handle, rank_title) for user in users]
         return grants
 
-all_ranks = [
-    'Newbie',
-    'Pupil',
-    'Specialist',
-    'Expert',
-    'Candidate Master',
-    'Master',
-    'International Master',
-    'Grandmaster',
-    'International Grandmaster',
-    'Legendary Grandmaster',
-]
-
-for rank in all_ranks:
+for rank in User.Rank:
     register_rank(rank)
