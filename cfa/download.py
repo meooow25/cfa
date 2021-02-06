@@ -278,7 +278,7 @@ def submissions():
 
     batch_size = 100_000
 
-    for c in Contest.select().order_by(Contest.id.desc()):
+    for c in Contest.select():
         if Submission.select().where(Submission.contest == c).exists():
             continue
 
@@ -304,52 +304,54 @@ def submissions():
 
                 repeated = unrated_author = team = ghost = 0
                 cur_ids = set()
-                data = []
-                for s in subs:
-                    id_ = s['id']
-                    cur_ids.add(id_)
-                    if id_ in last_ids:
-                        repeated += 1
-                        continue
 
-                    if 'verdict' not in s:
-                        print('no verdict', s)
-                        continue
+                def get_data():
+                    nonlocal repeated, unrated_author, team, ghost
+                    for s in subs:
+                        id_ = s['id']
+                        cur_ids.add(id_)
+                        if id_ in last_ids:
+                            repeated += 1
+                            continue
 
-                    party = s['author']
-                    if len(party['members']) == 0:
-                        ghost += 1
-                        continue
-                    if len(party['members']) > 1:
-                        team += 1
-                        continue
+                        if 'verdict' not in s:
+                            print('no verdict', s)
+                            continue
 
-                    handle = party['members'][0]['handle']
-                    try:
-                        author_id = user_map[handle]
-                    except KeyError:
-                        unrated_author += 1
-                        continue # not rated user
+                        party = s['author']
+                        if len(party['members']) == 0:
+                            ghost += 1
+                            continue
+                        if len(party['members']) > 1:
+                            team += 1
+                            continue
 
-                    problem_id = problem_map[(c.id, s['problem']['index'])]
-                    typ = ParticipantType[party['participantType']]
+                        handle = party['members'][0]['handle']
+                        try:
+                            author_id = user_map[handle]
+                        except KeyError:
+                            unrated_author += 1
+                            continue
 
-                    data.append((
-                        id_,
-                        c.id,
-                        problem_id,
-                        author_id,
-                        typ.value,
-                        s['programmingLanguage'],
-                        Submission.Verdict[s['verdict']].value,
-                        Submission.TestSet[s['testset']].value,
-                        s['passedTestCount'],
-                        s['timeConsumedMillis'],
-                        s['memoryConsumedBytes'],
-                    ))
+                        problem_id = problem_map[(c.id, s['problem']['index'])]
+                        typ = ParticipantType[party['participantType']]
+
+                        yield (
+                            id_,
+                            c.id,
+                            problem_id,
+                            author_id,
+                            typ.value,
+                            s['programmingLanguage'],
+                            Submission.Verdict[s['verdict']].value,
+                            Submission.TestSet[s['testset']].value,
+                            s['passedTestCount'],
+                            s['timeConsumedMillis'],
+                            s['memoryConsumedBytes'],
+                        )
 
                 rc = 0
-                for chunk in chunked(data, 20000):
+                for chunk in chunked(get_data(), 20000):
                     rc += Submission.insert_many(chunk).execute()
                 print(rc, 'submissions', repeated, 'repeated', unrated_author, 'unrated', team, 'team', ghost, 'ghost')
 
