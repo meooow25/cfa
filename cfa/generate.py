@@ -1,21 +1,18 @@
 import time
+from dataclasses import asdict, dataclass, field
 from typing import List
 
-from . import models
-from .models import User, RanklistRow
+from . import models, achievements
+from .achievement import AchievementWithStats, registered_achievements
 
-from .achievement import Achievement, AchievementWithStats, registered_achievements
-
-from . import achievements
-
-def get_achievements() -> List[AchievementWithStats]:
+def generate_achievements(db_path) -> List[AchievementWithStats]:
     if models.db.is_closed():
-        models.init('cf.db')
+        models.init(db_path)
         models.connect()
 
     achs = registered_achievements()
 
-    total_users = User.select().count()
+    total_users = models.User.select().count()
 
     achievements_with_stats = []
     for ach in achs:
@@ -30,3 +27,39 @@ def get_achievements() -> List[AchievementWithStats]:
         print(ach, f'{elapsed:.2f}s', len(grants), 'grants')
 
     return achievements_with_stats
+
+
+@dataclass
+class Achievement:
+    title: str
+    brief: str
+    description: str
+    users_awarded: int
+    users_awarded_fraction: float
+    grant_infos: List[str] = field(default_factory=list)
+
+
+@dataclass
+class User:
+    handle: str
+    achievements: List[Achievement] = field(default_factory=list)
+
+
+def to_user_based_dicts(achievements: List[AchievementWithStats]) -> List[dict]:
+    by_handle = {}
+    for ach_with_stats in achievements:
+        by_handle_inner = {}
+        ach = ach_with_stats.achievement
+        for grant in ach_with_stats.grants:
+            if grant.handle not in by_handle_inner:
+                by_handle_inner[grant.handle] = Achievement(ach.title, ach.brief, ach.description,
+                                                            ach_with_stats.users_awarded,
+                                                            ach_with_stats.users_awarded_fraction)
+            by_handle_inner[grant.handle].grant_infos.append(grant.info)
+
+        for handle, ach in by_handle_inner.items():
+            if handle not in by_handle:
+                by_handle[handle] = User(handle)
+            by_handle[handle].achievements.append(ach)
+
+    return list(map(asdict, by_handle.values()))
