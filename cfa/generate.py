@@ -29,23 +29,22 @@ def generate_achievements(db_path) -> List[AchievementWithStats]:
     return achievements_with_stats
 
 
-@dataclass
-class Achievement:
-    title: str
-    brief: str
-    description: str
-    users_awarded: int
-    users_awarded_fraction: float
-    grant_infos: List[str] = field(default_factory=list)
-
-
-@dataclass
-class User:
-    handle: str
-    achievements: List[Achievement] = field(default_factory=list)
-
-
 def to_user_based_dicts(achievements: List[AchievementWithStats]) -> List[dict]:
+
+    @dataclass
+    class Achievement:
+        title: str
+        brief: str
+        description: str
+        users_awarded: int
+        users_awarded_fraction: float
+        grant_infos: List[str] = field(default_factory=list)
+
+    @dataclass
+    class User:
+        handle: str
+        achievements: List[Achievement] = field(default_factory=list)
+
     by_handle = {}
     for ach_with_stats in achievements:
         by_handle_inner = {}
