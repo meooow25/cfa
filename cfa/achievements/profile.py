@@ -53,7 +53,7 @@ def top_contributor():
 @register(
     title='At my best',
     brief='Currently at peak rating',
-    description='Participated in a rated contest in the last 6 months and at peak rating')
+    description='Participated in a rated contest in the last 6 months and currently at peak rating')
 def at_my_best():
     six_months_ago = dt.datetime.now() - dt.timedelta(days=30 * 6)
     active = RatingChange.select(RatingChange.user).where(RatingChange.update_time > six_months_ago)
