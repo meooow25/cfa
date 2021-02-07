@@ -1,7 +1,5 @@
-from dataclasses import dataclass
-
 from ..achievement import Grant, register
-from ..models import User, RatingChange
+from ..models import User
 
 def register_rank(rank: User.Rank):
     rank_title = rank.title

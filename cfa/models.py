@@ -1,6 +1,5 @@
-from enum import Enum, auto
+from enum import Enum
 
-import requests
 from peewee import SqliteDatabase, Model
 from peewee import CharField, DateTimeField, ForeignKeyField, IntegerField, FloatField
 

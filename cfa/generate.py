@@ -2,8 +2,11 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import List
 
-from . import models, achievements
+from . import achievements  # registers individual achievements
+
+from . import models
 from .achievement import AchievementWithStats, registered_achievements
+
 
 def generate_achievements(db_path) -> List[AchievementWithStats]:
     if models.db.is_closed():

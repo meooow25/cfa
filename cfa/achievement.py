@@ -1,4 +1,3 @@
-import string
 from typing import Callable, List, NamedTuple
 
 DEFAULT_ICON_NAME = 'default.svg'

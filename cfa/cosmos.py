@@ -5,8 +5,6 @@ from collections import defaultdict
 from azure.cosmos import CosmosClient, ContainerProxy
 from tqdm import tqdm
 
-from .achievement import AchievementWithStats
-
 
 def get_container() -> ContainerProxy:
     conn_str = os.environ['AZURE_COSMOS_CONN_STRING']
