@@ -1,0 +1,29 @@
+{
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "route": "ach/{handle}"
+    },
+    {
+      "name": "documents",
+      "direction": "in",
+      "type": "cosmosDB",
+      "databaseName": "database",
+      "collectionName": "container",
+      "connectionStringSetting": "dbconn",
+      "sqlQuery": "SELECT * FROM c WHERE c.id = udf.CRC32_9({handle})"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "$return"
+    }
+  ]
+}
