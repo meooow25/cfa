@@ -2,8 +2,7 @@ import json
 
 import click
 
-from . import download
-from . import generate, cosmos
+from . import azure_cosmos, azure_storage, download, generate
 
 
 @click.group()
@@ -28,7 +27,7 @@ def gen(input, output, dbpath, jsonpath):
         with open(jsonpath, 'w') as f:
             json.dump(users_with_achievements, f)
     else: # cosmos
-        cosmos.save(users_with_achievements)
+        azure_cosmos.save(users_with_achievements)
 
 
 @base.command(name='download')
@@ -39,7 +38,7 @@ def gen(input, output, dbpath, jsonpath):
 @click.option('--hacks', is_flag=True)
 @click.option('--rating_changes', is_flag=True)
 @click.option('--submissions', is_flag=True)
-def dl(dbpath, users, contests, standings, hacks, rating_changes, submissions):
+def download_(dbpath, users, contests, standings, hacks, rating_changes, submissions):
     if not any((users, contests, standings, hacks, rating_changes, submissions)):
         click.secho('Nothing to download', fg='red')
         return
@@ -59,6 +58,13 @@ def dl(dbpath, users, contests, standings, hacks, rating_changes, submissions):
     if submissions:
         download.submissions()
     click.secho('Done')
+
+
+@base.command()
+@click.option('--icons_dir', default='icons', show_default=True)
+@click.option('--overwrite', is_flag=True)
+def upload_icons(icons_dir, overwrite):
+    azure_storage.upload_icons(icons_dir, overwrite)
 
 
 base(prog_name='cfa')

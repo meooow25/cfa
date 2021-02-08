@@ -1,6 +1,8 @@
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from typing import List
+from urllib.parse import urljoin
 
 from . import achievements  # registers individual achievements
 
@@ -39,6 +41,7 @@ def to_user_based_dicts(achievements: List[AchievementWithStats]) -> List[dict]:
         title: str
         brief: str
         description: str
+        icon_url: str
         users_awarded: int
         users_awarded_fraction: float
         grant_infos: List[str] = field(default_factory=list)
@@ -47,16 +50,19 @@ def to_user_based_dicts(achievements: List[AchievementWithStats]) -> List[dict]:
     class User:
         handle: str
         achievements: List[Achievement] = field(default_factory=list)
+    
+    icon_url_base = os.environ['ACHIEVEMENT_ICON_URL_BASE']
 
     by_handle = {}
     for ach_with_stats in achievements:
         by_handle_inner = {}
         ach = ach_with_stats.achievement
+
         for grant in ach_with_stats.grants:
             if grant.handle not in by_handle_inner:
-                by_handle_inner[grant.handle] = Achievement(ach.title, ach.brief, ach.description,
-                                                            ach_with_stats.users_awarded,
-                                                            ach_with_stats.users_awarded_fraction)
+                by_handle_inner[grant.handle] = Achievement(
+                    ach.title, ach.brief, ach.description, urljoin(icon_url_base, ach.icon_name),
+                    ach_with_stats.users_awarded, ach_with_stats.users_awarded_fraction)
             by_handle_inner[grant.handle].grant_infos.append(grant.info)
 
         for handle, ach in by_handle_inner.items():
