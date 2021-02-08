@@ -8,9 +8,12 @@ from tqdm import tqdm
 
 def get_container() -> ContainerProxy:
     conn_str = os.environ['AZURE_COSMOS_CONN_STRING']
+    db_name = os.getenv('AZURE_COSMOS_DATABASE', 'database')
+    container_name = os.getenv('AZURE_COSMOS_CONTAINER', 'container')
+
     client = CosmosClient.from_connection_string(conn_str=conn_str)
-    database = client.get_database_client('database1')
-    return database.get_container_client('container3')
+    database = client.get_database_client(db_name)
+    return database.get_container_client(container_name)
 
 
 def crc32_9(s):
