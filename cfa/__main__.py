@@ -10,26 +10,6 @@ def base():
     pass
 
 
-@base.command()
-@click.option('--input', type=click.Choice(['dbgen', 'json']), required=True)
-@click.option('--output', type=click.Choice(['json', 'cosmos']), required=True)
-@click.option('--dbpath', default='cf.db', show_default=True)
-@click.option('--jsonpath', default='achs.json', show_default=True)
-def gen(input, output, dbpath, jsonpath):
-    if input == 'dbgen':
-        achs = generate.generate_achievements(dbpath)
-        users_with_achievements = generate.to_user_based_dicts(achs)
-    else: # json
-        with open(jsonpath) as f:
-            users_with_achievements = json.load(f)
-
-    if output == 'json':
-        with open(jsonpath, 'w') as f:
-            json.dump(users_with_achievements, f)
-    else: # cosmos
-        azure_cosmos.save_users(users_with_achievements)
-
-
 @base.command(name='download')
 @click.option('--dbpath', default='cf.db', show_default=True)
 @click.option('--users', is_flag=True)
@@ -57,7 +37,28 @@ def download_(dbpath, users, contests, standings, hacks, rating_changes, submiss
         download.rating_changes()
     if submissions:
         download.submissions()
-    click.secho('Done')
+    click.echo('Done')
+
+
+@base.command()
+@click.option('--dbpath', default='cf.db', show_default=True)
+@click.option('--jsonpath', default='achs.json', show_default=True)
+@click.option('--also_upload', is_flag=True)
+def gen_achs(dbpath, jsonpath, also_upload):
+    achs = generate.generate_achievements(dbpath)
+    users_with_achievements = generate.to_user_based_dicts(achs)
+    with open(jsonpath, 'w') as f:
+        json.dump(users_with_achievements, f)
+    if also_upload:
+        upload_achs(jsonpath)
+
+
+@base.command()
+@click.option('--jsonpath', default='achs.json', show_default=True)
+def upload_achs(jsonpath):
+    with open(jsonpath) as f:
+        users_with_achievements = json.load(f)
+    azure_cosmos.save_users(users_with_achievements)
 
 
 @base.command()
