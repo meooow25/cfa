@@ -22,7 +22,9 @@ def api_get(path):
     j = r.json()
     last = time.time()
     if 'result' in j:
-        assert r.headers['Content-Encoding'] == 'gzip', r.headers['Content-Encoding']
+        # Sometimes for small responses it's not gzipped
+        # enc = r.headers.get('Content-Encoding')
+        # assert enc == 'gzip', f'Got encoding {enc} {j}'
         return j['result']
     raise Exception(j)
 
@@ -71,7 +73,8 @@ def contests():
 
 
 def standings():
-    known = [
+    # These appear more than once in the same ranklist ¯\_(ツ)_/¯
+    known_repeats = (
         (158, 'r_hero'),
         (158, 'hashlife'),
         (172, 'pepela'),
@@ -83,7 +86,7 @@ def standings():
         (615, 'mohamedazab'),
         (615, 'Altitude'),
         (616, 'shankhs'),
-    ]
+    )
     for c in Contest.select():
         if ContestProblem.select().where(ContestProblem.contest == c).exists():
             continue
@@ -123,6 +126,7 @@ def standings():
             print(rc, 'contest problems')
 
             users_seen = set()
+            unrated_users = 0
             data = []
             data_pr = []
             for r in rows:
@@ -131,16 +135,14 @@ def standings():
                     continue  # Skip teams
                 handle = party['members'][0]['handle']
                 if handle in users_seen:
-                    if (c.id, handle) in known:
+                    if (c.id, handle) in known_repeats:
                         continue
                     raise Exception(c.id, handle)
                 users_seen.add(handle)
                 try:
                     user = User.get(User.handle == handle)
                 except User.DoesNotExist:
-                    # user participated in this unrated contest and never in another rated contest
-                    # skip i guess
-                    print('skipping user', handle)
+                    unrated_users += 1
                     continue
 
                 participant_type = ParticipantType[party['participantType']]
@@ -171,7 +173,7 @@ def standings():
 
 
             rc = RanklistRow.insert_many(data).execute()
-            print(rc, 'ranklist rows')
+            print(rc, 'ranklist rows', unrated_users, 'unrated users')
 
             rc = 0
             for chunk in chunked(data_pr, 10000):
@@ -194,6 +196,7 @@ def hacks():
             print()
             continue
 
+        unrated_skipped = 0
         data = []
         for h in hacks:
             hacker = h['hacker']['members']
@@ -205,7 +208,7 @@ def hacks():
                 defender = User.get(User.handle == defender[0]['handle'])
             except User.DoesNotExist:
                 # hacker or defender is not rated
-                # example "md5" in contest 21 Codeforces Alpha Round #21 (Codeforces format)
+                unrated_skipped += 1
                 continue
             data.append(dict(
                 id=h['id'],
@@ -219,20 +222,21 @@ def hacks():
             ))
 
         rc = Hack.insert_many(data).execute()
-        print(rc, 'hacks')
+        print(rc, 'hacks', unrated_skipped, 'unrated skips')
         print('')
 
 
 def rating_changes():
-    known = (
+    # These appear more than once in the same ranklist ¯\_(ツ)_/¯
+    known_repeats = (
         (447, 'kasim'),
         (472, 'a00920'),
         (472, 'yuki2006'),
-        (615, "Altitude"),
-        (615, "InnocentFool"),
-        (615, "bohuss"),
-        (615, "elgris"),
-        (615, "mohamedazab"),
+        (615, 'Altitude'),
+        (615, 'InnocentFool'),
+        (615, 'bohuss'),
+        (615, 'elgris'),
+        (615, 'mohamedazab'),
     )
     for c in Contest.select():
         if RatingChange.select().where(RatingChange.contest == c).exists():
@@ -251,7 +255,7 @@ def rating_changes():
         for d in changes:
             handle = d['handle']
             if handle in seen:
-                if (c.id, handle) in known:
+                if (c.id, handle) in known_repeats:
                     continue
                 raise Exception(c.id, handle)
             seen.add(handle)
