@@ -27,7 +27,7 @@ def gen(input, output, dbpath, jsonpath):
         with open(jsonpath, 'w') as f:
             json.dump(users_with_achievements, f)
     else: # cosmos
-        azure_cosmos.save(users_with_achievements)
+        azure_cosmos.save_users(users_with_achievements)
 
 
 @base.command(name='download')

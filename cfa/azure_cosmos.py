@@ -23,7 +23,7 @@ def crc32_9(s):
     return f'{n9:03x}'
 
 
-def save(users_with_achievements: list):
+def save_users(users_with_achievements: list):
     container = get_container()
 
     # There are more than 300k users and bulk updating on Cosmos is a pain in the ass.
