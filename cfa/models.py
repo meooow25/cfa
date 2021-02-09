@@ -3,7 +3,6 @@ from enum import Enum
 from peewee import SqliteDatabase, Model
 from peewee import CharField, DateTimeField, ForeignKeyField, IntegerField, FloatField
 
-# - Put a small max length on char fields (default is 255)
 # - Put lazy_load=False on foreign keys so that peewee doesn't auto query them when you forget to
 #   do a join.
 
@@ -23,7 +22,7 @@ class ParticipantType(Enum):
 
 
 class User(BaseModel):
-    handle = CharField(unique=True, max_length=32)
+    handle = CharField(unique=True)
     contribution = IntegerField()
     rank = IntegerField()  # Rank
     rating = IntegerField()
@@ -61,7 +60,7 @@ class Contest(BaseModel):
 
 
 class Problem(BaseModel):
-    name = CharField(max_length=128)
+    name = CharField()
     contest_start_time = DateTimeField()
     rating = IntegerField(null=True)
     tags = CharField()
@@ -74,7 +73,7 @@ class Problem(BaseModel):
 
 class ContestProblem(BaseModel):
     contest = ForeignKeyField(Contest, index=True, lazy_load=False)
-    index = CharField(max_length=8)
+    index = CharField()
     problem = ForeignKeyField(Problem, lazy_load=False)
 
     class Meta:
@@ -89,7 +88,7 @@ class Submission(BaseModel):
     problem = ForeignKeyField(ContestProblem, lazy_load=False)
     author = ForeignKeyField(User, lazy_load=False)
     type = IntegerField()  # ParticipationType
-    programming_language = CharField(max_length=32)
+    programming_language = CharField()
     verdict = IntegerField()
     testset = IntegerField()
     passed_test_count = IntegerField()
@@ -173,7 +172,7 @@ class RanklistRow(BaseModel):
 class ProblemResult(BaseModel):
     contest = ForeignKeyField(Contest, lazy_load=False)
     user = ForeignKeyField(User, lazy_load=False)
-    problem_index = CharField(max_length=8)
+    problem_index = CharField()
     points = FloatField()
     penalty = IntegerField()
     rejected_attempt_count = IntegerField()
