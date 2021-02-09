@@ -11,9 +11,7 @@ from .achievement import AchievementWithStats, registered_achievements
 
 
 def generate_achievements(db_path) -> List[AchievementWithStats]:
-    if models.db.is_closed():
-        models.init(db_path)
-        models.connect()
+    models.init(db_path)
 
     achs = registered_achievements()
 

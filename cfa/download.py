@@ -31,7 +31,6 @@ def api_get(path):
 
 def init(db_path):
     models.init(db_path)
-    models.connect()
     models.create_tables()
 
 

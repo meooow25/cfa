@@ -201,14 +201,9 @@ class RatingChange(BaseModel):
 
 def init(db_path):
     db.init(db_path)
-
-def connect():
     db.connect()
 
 def create_tables():
     db.create_tables([
         User, Contest, Problem, ContestProblem, Submission, Hack, RanklistRow, ProblemResult,
         RatingChange])
-
-def close():
-    return db.close()
