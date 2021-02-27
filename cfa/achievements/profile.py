@@ -6,7 +6,7 @@ from ..models import RatingChange, User
 
 @register(
     title='Hello, world!',
-    brief='Have an account created in the last 2 months')
+    brief='Created your account in the last 2 months')
 def hello_world():
     now = dt.datetime.now()
     two_months_ago = now - dt.timedelta(days=60)
@@ -19,7 +19,7 @@ def hello_world():
 
 @register(
     title='Veteran',
-    brief='Have an account that is at least 10 years old')
+    brief='Created your account at least 10 years ago')
 def veteran():
     now = dt.datetime.now()
     ten_years_ago = now - dt.timedelta(days=10 * 365)
@@ -37,16 +37,6 @@ def celebrity():
     users = User.select().where(User.friend_of_count >= 1000)
     info_fmt = 'Friend of {} users'
     grants = [Grant(user.handle, info_fmt.format(user.friend_of_count)) for user in users]
-    return grants
-
-
-@register(
-    title='Top contributor',
-    brief='Have at least 100 contribution')
-def top_contributor():
-    users = User.select().where(User.contribution >= 100)
-    info_fmt = 'Contribution {}'
-    grants = [Grant(user.handle, info_fmt.format(user.contribution)) for user in users]
     return grants
 
 

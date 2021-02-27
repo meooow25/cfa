@@ -2,14 +2,13 @@ from ..achievement import Grant, register
 from ..models import User
 
 def register_rank(rank: User.Rank):
-    rank_title = rank.title
     @register(
-        title=rank_title,
-        brief="I'm a " + rank_title,
-        description='Have rank ' + rank_title)
+        title=rank.title,
+        brief=f"I'm a {rank.title}!",
+        description=f'Have rank {rank.title}')
     def func():
         users = User.select().where(User.rank == rank.value)
-        grants = [Grant(user.handle, rank_title) for user in users]
+        grants = [Grant(user.handle, rank.title) for user in users]
         return grants
 
 for rank in User.Rank:
