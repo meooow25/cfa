@@ -6,7 +6,11 @@ from peewee import CharField, DateTimeField, ForeignKeyField, IntegerField, Floa
 # - Put lazy_load=False on foreign keys so that peewee doesn't auto query them when you forget to
 #   do a join.
 
-db = SqliteDatabase(None)
+PRAGMAS = {
+    'cache_size': -1024 * 64,  # 64MB
+}
+
+db = SqliteDatabase(None, pragmas=PRAGMAS)
 
 class BaseModel(Model):
     class Meta:
