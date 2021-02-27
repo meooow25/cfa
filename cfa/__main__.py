@@ -12,13 +12,15 @@ def base():
 
 @base.command(name='download')
 @click.option('--dbpath', default='cf.db', show_default=True)
+@click.option('--h5path', default='cf.h5', show_default=True)
 @click.option('--users', is_flag=True)
 @click.option('--contests', is_flag=True)
 @click.option('--standings', is_flag=True)
 @click.option('--hacks', is_flag=True)
 @click.option('--rating_changes', is_flag=True)
 @click.option('--submissions', is_flag=True)
-def download_(dbpath, users, contests, standings, hacks, rating_changes, submissions):
+@click.option('--only_move_subs', is_flag=True)
+def download_(dbpath, h5path, users, contests, standings, hacks, rating_changes, submissions, only_move_subs):
     if not any((users, contests, standings, hacks, rating_changes, submissions)):
         click.secho('Nothing to download', fg='red')
         return
@@ -36,7 +38,9 @@ def download_(dbpath, users, contests, standings, hacks, rating_changes, submiss
     if rating_changes:
         download.rating_changes()
     if submissions:
-        download.submissions()
+        if not only_move_subs:
+            download.submissions(h5path)
+        download.move_subs_h5_to_db(h5path)
     click.echo('Done')
 
 

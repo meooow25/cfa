@@ -3,8 +3,10 @@ import time
 
 import requests
 from peewee import chunked
+from tqdm import tqdm
 
 from . import models
+from . import tmodels
 from .models import User, Contest, Problem, ContestProblem, Submission, Hack, RanklistRow, RatingChange, ProblemResult, ParticipantType
 
 
@@ -37,6 +39,8 @@ def init(db_path):
 def users():
     user_list = api_get('user.ratedList?activeOnly=false')
     print(len(user_list), 'rated users')
+    
+    # TODO: Add Mike. Mike is not rated but of course people will want to check his achievements.
 
     to_insert = ((
         u['handle'],
@@ -61,6 +65,9 @@ def contests():
     contest_list = api_get('contest.list')
     data = []
     for c in contest_list:
+        if 'Технокубок' in c['name']:
+            # Technocup contests that show up in contest list but bug out on all other endpoints.
+            continue
         data.append(dict(
             id=c['id'],
             name=c['name'],
@@ -272,25 +279,31 @@ def rating_changes():
         print('')
 
 
-def submissions():
+def submissions(h5_path):
     # TODO: There's a memory leak here, figure out what's going on
 
     # for efficiency
     user_map = {u.handle: u.id for u in User.select()}
     problem_map = {(p.contest_id, p.index): p.id for p in ContestProblem.select()}
 
-    batch_size = 100_000
+    with tmodels.Table.open_append(h5_path) as table:
+        group = table.get_or_create_group(table.root, 'submissions')
 
-    for c in Contest.select():
-        if Submission.select().where(Submission.contest == c).exists():
-            continue
+        for c in Contest.select():
+            ctable = table.get_or_create_table(group, f'c{c.id}', tmodels.Submission)
 
-        print('contest', c.id, c.name)
-        # The amount of submission for many contests are huge enough to eat up ~2GB of memory and
-        # make the program crash.
-        # Try in batches
+            # pytables has no transactions, so we mark a table as done on completion
+            if getattr(ctable.attrs, 'done', False):
+                continue
+            # Delete all rows from some older incomplete attempt
+            ctable.remove_rows(0, ctable.nrows)
 
-        with models.db.atomic():
+            print('contest', c.id, c.name)
+            # The amount of submission for many contests are huge enough to eat up ~2GB of memory and
+            # make the program crash.
+            # Try in batches
+            batch_size = 100_000
+
             done = 0
             last_ids = set()
             while True:
@@ -308,59 +321,76 @@ def submissions():
                 repeated = unrated_author = team = ghost = 0
                 cur_ids = set()
 
-                def get_data():
-                    nonlocal repeated, unrated_author, team, ghost
-                    for s in subs:
-                        id_ = s['id']
-                        cur_ids.add(id_)
-                        if id_ in last_ids:
-                            repeated += 1
-                            continue
+                data = []
+                for s in subs:
+                    id_ = s['id']
+                    cur_ids.add(id_)
+                    if id_ in last_ids:
+                        repeated += 1
+                        continue
 
-                        if 'verdict' not in s:
-                            print('no verdict', s)
-                            continue
+                    if 'verdict' not in s:
+                        print('no verdict', s)
+                        continue
 
-                        party = s['author']
-                        if len(party['members']) == 0:
-                            ghost += 1
-                            continue
-                        if len(party['members']) > 1:
-                            team += 1
-                            continue
+                    party = s['author']
+                    if len(party['members']) == 0:
+                        ghost += 1
+                        continue
+                    if len(party['members']) > 1:
+                        team += 1
+                        continue
 
-                        handle = party['members'][0]['handle']
-                        try:
-                            author_id = user_map[handle]
-                        except KeyError:
-                            unrated_author += 1
-                            continue
+                    handle = party['members'][0]['handle']
+                    try:
+                        author_id = user_map[handle]
+                    except KeyError:
+                        unrated_author += 1
+                        continue
 
-                        problem_id = problem_map[(c.id, s['problem']['index'])]
-                        typ = ParticipantType[party['participantType']]
+                    problem_id = problem_map[(c.id, s['problem']['index'])]
+                    typ = ParticipantType[party['participantType']]
 
-                        yield (
-                            id_,
-                            c.id,
-                            problem_id,
-                            author_id,
-                            typ.value,
-                            s['programmingLanguage'],
-                            Submission.Verdict[s['verdict']].value,
-                            Submission.TestSet[s['testset']].value,
-                            s['passedTestCount'],
-                            s['timeConsumedMillis'],
-                            s['memoryConsumedBytes'],
-                        )
+                    # Same order as tmodels.Submission
+                    data.append((
+                        id_,
+                        c.id,
+                        problem_id,
+                        author_id,
+                        typ.value,
+                        s['programmingLanguage'],
+                        Submission.Verdict[s['verdict']].value,
+                        Submission.TestSet[s['testset']].value,
+                        s['passedTestCount'],
+                        s['timeConsumedMillis'],
+                        s['memoryConsumedBytes'],
+                    ))
 
-                rc = 0
-                for chunk in chunked(get_data(), 20000):
-                    rc += Submission.insert_many(chunk).execute()
-                print(rc, 'submissions', repeated, 'repeated', unrated_author, 'unrated', team, 'team', ghost, 'ghost')
+                if data:
+                    ctable.append(data)
+                    ctable.flush()
+
+                print(len(data), 'submissions', repeated, 'repeated', unrated_author, 'unrated', team, 'team', ghost, 'ghost')
 
                 if len(subs) < batch_size:
                     break
                 done += len(subs)
                 last_ids = cur_ids
 
-        print()
+            ctable.attrs.done = True
+            print()
+
+
+def move_subs_h5_to_db(h5_path):
+    batch_size = 20000
+
+    with tmodels.Table.open_read(h5_path) as table, models.db.atomic():
+        group = getattr(table.root, 'submissions')
+        all_tables = list(group)
+
+        for ctable in tqdm(all_tables, desc='Copying', ncols=80):            
+            with tqdm(total=ctable.nrows, desc=ctable.name, ncols=80, leave=False) as pbar:
+                rows = (row[:] for row in ctable)
+                for chunk in chunked(rows, batch_size):
+                    rc = Submission.insert_many(chunk).execute()
+                    pbar.update(rc)
