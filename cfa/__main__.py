@@ -1,8 +1,19 @@
 import json
+import logging
+import os
 
 import click
 
 from . import azure_cosmos, azure_storage, download, generate
+
+
+logger = logging.getLogger('cfa')
+handler = logging.StreamHandler()
+handler.setFormatter(
+    logging.Formatter('{asctime}:{name}:{levelname:.4}: {message}', style='{',
+                      datefmt='%H:%M:%S'))
+logger.setLevel(os.getenv('LOGLEVEL', 'DEBUG'))
+logger.addHandler(handler)
 
 
 @click.group()

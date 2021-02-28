@@ -1,4 +1,5 @@
 import os
+import logging
 import time
 from dataclasses import asdict, dataclass, field
 from typing import List
@@ -10,6 +11,9 @@ from . import models
 from .achievement import AchievementWithStats, registered_achievements
 
 
+logger = logging.getLogger(__name__)
+
+
 def generate_achievements(db_path) -> List[AchievementWithStats]:
     models.init(db_path)
 
@@ -19,15 +23,12 @@ def generate_achievements(db_path) -> List[AchievementWithStats]:
 
     achievements_with_stats = []
     for ach in achs:
-        start = time.monotonic()
         grants = ach.calculate_grants()
-        elapsed = time.monotonic() - start
-
         users_awarded = len(set(grant.handle for grant in grants))
         users_awarded_fraction = users_awarded / total_users
         achievements_with_stats.append(
             AchievementWithStats(ach, grants, users_awarded, users_awarded_fraction))
-        print(ach, f'{elapsed:.2f}s', len(grants), 'grants')
+        logger.info('%s, %s grants', ach, len(grants))
 
     return achievements_with_stats
 

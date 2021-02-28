@@ -1,4 +1,5 @@
 import datetime as dt
+import logging
 import time
 
 import requests
@@ -9,6 +10,8 @@ from . import models
 from . import tmodels
 from .models import User, Contest, Problem, ContestProblem, Submission, Hack, RanklistRow, RatingChange, ProblemResult, ParticipantType
 
+
+logger = logging.getLogger(__name__)
 
 API_BASE = 'https://codeforces.com/api/'
 
@@ -38,8 +41,8 @@ def init(db_path):
 
 def users():
     user_list = api_get('user.ratedList?activeOnly=false')
-    print(len(user_list), 'rated users')
-    
+    logger.info('%s rated users fetched', len(user_list))
+
     # TODO: Add Mike. Mike is not rated but of course people will want to check his achievements.
 
     to_insert = ((
@@ -58,11 +61,13 @@ def users():
         for chunk in chunked(to_insert, 20000):
             User.insert_many(chunk).execute()
 
-    print(User.select().count(), 'users in db')
+    logger.info('%s users in db', User.select().count())
 
 
 def contests():
     contest_list = api_get('contest.list')
+    logger.info('%s contests fetched', len(contest_list))
+
     data = []
     for c in contest_list:
         if 'Технокубок' in c['name']:
@@ -75,7 +80,7 @@ def contests():
         ))
     Contest.insert_many(data).execute()
 
-    print(Contest.select().count(), 'contests in db')
+    logger.info('%s contests in db', Contest.select().count())
 
 
 def standings():
@@ -98,12 +103,11 @@ def standings():
             continue
 
         with models.db.atomic():
-            print('contest', c.id, c.name)
+            logger.info('contest %s %s', c.id, c.name)
             try:
                 j = api_get('contest.standings?contestId=%s' % c.id)
             except Exception as e:
-                print(e)
-                print()
+                logger.info(e)
                 continue
 
             problems = j['problems']
@@ -118,7 +122,7 @@ def standings():
                     tags=p['tags'],
                 ))
             rc = Problem.insert_many(data).on_conflict_ignore().execute()
-            print(rc, 'problems')
+            logger.debug('%s problems added to db', rc)
 
             data = []
             for p in problems:
@@ -129,7 +133,7 @@ def standings():
                     index=p['index'],
                 ))
             rc = ContestProblem.insert_many(data).execute()
-            print(rc, 'contest problems')
+            logger.debug('%s contest problems added to db', rc)
 
             users_seen = set()
             unrated_users = 0
@@ -179,14 +183,14 @@ def standings():
 
 
             rc = RanklistRow.insert_many(data).execute()
-            print(rc, 'ranklist rows', unrated_users, 'unrated users')
+            logger.debug('%s ranklist rows added to db', rc)
+            if unrated_users:
+                logger.debug('%s unrated users skipped', unrated_users)
 
             rc = 0
             for chunk in chunked(data_pr, 10000):
                 rc += ProblemResult.insert_many(chunk).execute()
-            print(rc, 'problem result rows')
-
-            print('')
+            logger.debug('%s problem result rows added to db', rc)
 
 
 def hacks():
@@ -194,12 +198,11 @@ def hacks():
         if Hack.select().where(Hack.contest_id == c.id).exists():
             continue
 
-        print('contest', c.id, c.name)
+        logger.info('contest %s %s', c.id, c.name)
         try:
             hacks = api_get('contest.hacks?contestId=%s' % c.id)
         except Exception as e:
-            print(e)
-            print()
+            logger.info(e)
             continue
 
         unrated_skipped = 0
@@ -228,8 +231,9 @@ def hacks():
             ))
 
         rc = Hack.insert_many(data).execute()
-        print(rc, 'hacks', unrated_skipped, 'unrated skips')
-        print('')
+        logger.debug('%s hacks added to db', rc)
+        if unrated_skipped:
+            logger.debug('%s hacks involving unrated users skipped', unrated_skipped)
 
 
 def rating_changes():
@@ -248,12 +252,11 @@ def rating_changes():
         if RatingChange.select().where(RatingChange.contest == c).exists():
             continue
 
-        print('contest', c.id, c.name)
+        logger.info('contest %s %s', c.id, c.name)
         try:
             changes = api_get('contest.ratingChanges?contestId=%s' % c.id)
         except Exception as e:
-            print(e)
-            print()
+            logger.info(e)
             continue
 
         seen = set()
@@ -275,8 +278,7 @@ def rating_changes():
             ))
 
         rc = RatingChange.insert_many(data).execute()
-        print(rc, 'rating changes')
-        print('')
+        logger.debug('%s rating changes added to db', rc)
 
 
 def submissions(h5_path):
@@ -298,7 +300,7 @@ def submissions(h5_path):
             # Delete all rows from some older incomplete attempt
             ctable.remove_rows(0, ctable.nrows)
 
-            print('contest', c.id, c.name)
+            logger.info('contest %s %s', c.id, c.name)
             # The amount of submission for many contests are huge enough to eat up ~2GB of memory and
             # make the program crash.
             # Try in batches
@@ -312,11 +314,11 @@ def submissions(h5_path):
                 except Exception as e:
                     stre = str(e)
                     if 'not found' in stre or 'not started' in stre:
-                        print(e)
+                        logger.info(e)
                         break
                     raise e
 
-                print(f'got {len(subs)} from {done}')
+                logger.debug('got %s subs starting at %s', len(subs), done)
 
                 repeated = unrated_author = team = ghost = 0
                 cur_ids = set()
@@ -330,7 +332,7 @@ def submissions(h5_path):
                         continue
 
                     if 'verdict' not in s:
-                        print('no verdict', s)
+                        logger.debug('no verdict %s', s)
                         continue
 
                     party = s['author']
@@ -369,8 +371,11 @@ def submissions(h5_path):
                 if data:
                     ctable.append(data)
                     ctable.flush()
-
-                print(len(data), 'submissions', repeated, 'repeated', unrated_author, 'unrated', team, 'team', ghost, 'ghost')
+                
+                logger.debug('%s submissions added to db', len(data))
+                if repeated or unrated_author or team or ghost:
+                    logger.debug('%s repeated, %s unrated author, %s team, %s ghost',
+                                 repeated, unrated_author, team, ghost)
 
                 if len(subs) < batch_size:
                     break
@@ -378,7 +383,6 @@ def submissions(h5_path):
                 last_ids = cur_ids
 
             ctable.attrs.done = True
-            print()
 
 
 def move_subs_h5_to_db(h5_path):
@@ -388,7 +392,7 @@ def move_subs_h5_to_db(h5_path):
         group = getattr(table.root, 'submissions')
         all_tables = list(group)
 
-        for ctable in tqdm(all_tables, desc='Copying', ncols=80):            
+        for ctable in tqdm(all_tables, desc='Copying subs to db', ncols=80):            
             with tqdm(total=ctable.nrows, desc=ctable.name, ncols=80, leave=False) as pbar:
                 rows = (row[:] for row in ctable)
                 for chunk in chunked(rows, batch_size):
