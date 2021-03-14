@@ -4,7 +4,10 @@ import os
 
 import click
 
-from . import azure_cosmos, azure_storage, download, generate
+from . import download
+from . import generate
+from . import local_server
+from . import azure_cosmos, azure_storage
 
 
 logger = logging.getLogger('cfa')
@@ -81,6 +84,14 @@ def upload_achs(jsonpath):
 @click.option('--overwrite', is_flag=True)
 def upload_icons(icons_dir, overwrite):
     azure_storage.upload_icons(icons_dir, overwrite)
+
+
+@base.command()
+@click.option('--port', default=4908, show_default=True)
+@click.option('--jsonpath', default='achs.json', show_default=True)
+@click.option('--icons_dir', default='icons', show_default=True)
+def serve(port, jsonpath, icons_dir):
+    local_server.launch(port, jsonpath, icons_dir)
 
 
 base(prog_name='cfa')

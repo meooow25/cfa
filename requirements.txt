@@ -1,5 +1,6 @@
 azure-cosmos
 azure-storage-blob
+bottle
 click
 peewee
 pysqlite3-binary  # for latest sqlite, peewee auto-detects it

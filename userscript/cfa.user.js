@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name        Codeforces Achievements (WIP)
+// @name        [WIP] Codeforces Achievements
 // @namespace   https://github.com/meooow25
 // @match       *://*.codeforces.com/profile/*
 // @grant       GM.xmlHttpRequest
-// @version     0.1
+// @version     0.1.0
 // @author      meooow
 // @description Shows unofficial Codeforces achievements
 // @require     https://cdnjs.cloudflare.com/ajax/libs/mustache.js/4.1.0/mustache.min.js
@@ -12,8 +12,13 @@
 (async function() {
   'use strict';
 
+  const LOCAL = true;
+  const API_URL_BASE = LOCAL
+      ? 'http://localhost:4908/ach/'
+      : 'https://cfa-api.azurewebsites.net/api/ach/';
+
   const handle = document.querySelector('.info .rated-user').textContent.trim();
-  const url = 'https://cfa-api.azurewebsites.net/api/ach/' + handle;
+  const url = API_URL_BASE + handle;
 
   const details = await new Promise((res, rej) => {
     GM.xmlHttpRequest({
@@ -32,8 +37,7 @@
   // From https://stackoverflow.com/a/35385518
   function htmlToElement(html) {
     let template = document.createElement('template');
-    html = html.trim();
-    template.innerHTML = html;
+    template.innerHTML = html.trim();
     return template.content.firstChild;
   }
 
