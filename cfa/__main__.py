@@ -91,7 +91,9 @@ def upload_icons(icons_dir, overwrite):
 @click.option('--jsonpath', default='achs.json', show_default=True)
 @click.option('--icons_dir', default='icons', show_default=True)
 def serve(port, jsonpath, icons_dir):
-    local_server.launch(port, jsonpath, icons_dir)
+    with open(jsonpath) as f:
+        users_with_achievements = json.load(f)
+    local_server.launch(port, users_with_achievements, icons_dir)
 
 
 base(prog_name='cfa')

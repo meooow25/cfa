@@ -1,21 +1,23 @@
 import json
+from typing import List
 
-from bottle import Bottle, run, static_file
+from bottle import Bottle, static_file
 
 
-def launch(port, json_path, icons_dir, ach_path='/ach', icon_path='/static'):
-    with open(json_path) as f:
-        achs = json.load(f)
-    achs_by_handle = {ach['handle']: ach for ach in achs}
+def launch(
+        port: int, users_with_achievements: List[dict], icons_dir: str,
+        ach_path: str = '/ach', icon_path: str = '/static'):
+
+    by_handle = {user['handle']: user for user in users_with_achievements}
 
     app = Bottle()
 
     @app.route(ach_path + '/<handle>')
     def ach(handle):
-        return achs_by_handle[handle]
+        return by_handle[handle]
 
     @app.route(icon_path + '/<filename>')
     def static(filename):
         return static_file(filename, root=icons_dir)
 
-    run(app, host='localhost', port=port, debug=True)
+    app.run(host='localhost', port=port, debug=True)
