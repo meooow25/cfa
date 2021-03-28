@@ -18,15 +18,21 @@
   const DEBUG = true;
 
   const API_URL_BASE = LOCAL
-      ? 'http://localhost:4908/ach/'
-      : 'https://cfa-api.azurewebsites.net/api/ach/';
-  const REFRESH_INTERVAL = LOCAL ? 60 * 1000 : 60 * 60 * 1000; // 60 s / 1 h
+    ? 'http://localhost:4908/ach/'
+    : 'https://cfa-api.azurewebsites.net/api/ach/';
+  const REFRESH_INTERVAL = LOCAL ? 60 * 1000 : 60 * 60 * 1000; // 1m / 1h
   const wrap = log => (...args) => log('[cfa]', ...args);
   const Log = {
     debug: DEBUG ? wrap(console.debug) : () => {},
     info: wrap(console.info),
     error: wrap(console.error),
   };
+
+  function assert(v) {
+    if (!v) {
+      throw new Error('Assert failed: ' + v);
+    }
+  }
 
   // From https://stackoverflow.com/a/35385518
   function htmlToElement(html) {
@@ -36,6 +42,7 @@
   }
 
   async function fetchAchievements(handle) {
+    Log.debug('Fetching achievements for:', handle);
     const url = API_URL_BASE + handle;
     return new Promise((res, rej) => {
       GM.xmlHttpRequest({
@@ -43,7 +50,9 @@
         method: 'GET',
         onload: (response) => {
           if (response.status === 200) {
-            res(JSON.parse(response.responseText));
+            const result = JSON.parse(response.responseText);
+            Log.debug('Fetched achievements:', result);
+            res(result);
           } else {
             rej(response);
           }
@@ -112,36 +121,44 @@
     $.facebox.reveal(htmlToElement(html));
   }
 
-  async function maybeCacheForLoggedInUser() {
-    if (!loggedInUser) {
-      return;
-    }
-
+  async function maintainLastLoggedInUser() {
     const lastLoggedInUser = await Storage.loggedInUser.get();
     if (!lastLoggedInUser || lastLoggedInUser !== loggedInUser) {
       await Storage.currentAchievements.set(null);
       await Storage.pendingAchievements.set(null);
       await Storage.loggedInUser.set(loggedInUser);
     }
+  }
 
-    async function maybeRefresh() {
-      const now = Date.now();
+  async function fetchPendingAchievementsForLoggedInUser() {
+    assert(loggedInUser);
+
+    Log.debug('Fetching pending achievements');
+    const pending = await fetchAchievements(loggedInUser);
+    await Storage.pendingAchievements.set(pending);
+    await Storage.lastUpdated.set(Date.now());
+
+    const current = await Storage.currentAchievements.get();
+    if (!current) {
+      // No achievements saved, first time.
+      await Storage.currentAchievements.set(pending);
+      Log.info('Saved achievements for the first time');
+    }
+  }
+
+  async function setupRefreshForLoggedInUser() {
+
+    async function refresh() {
       const lastUpdated = await Storage.lastUpdated.get(0);
-      if (now - lastUpdated >= REFRESH_INTERVAL) {
-        Log.debug('Fetching achievements');
-        const details = await fetchAchievements(loggedInUser);
-        Log.debug('Fetched', details);
-        await Storage.pendingAchievements.set(details);
-        await Storage.lastUpdated.set(now);
+      if (Date.now() - lastUpdated >= REFRESH_INTERVAL) {
+        await fetchPendingAchievementsForLoggedInUser();
       }
+
       const pending = await Storage.pendingAchievements.get();
       const current = await Storage.currentAchievements.get();
-      if (!current) {
-        // No achievements saved, first time.
-        await Storage.currentAchievements.set(pending);
-        Log.info('Saved achievements for the first time');
-        return;
-      }
+      assert(pending);
+      assert(current);
+
       const diffs = calculateDiffs(current.achievements, pending.achievements);
       if (diffs.changed) {
         const currentTitles = current.achievements.map(ach => ach.title);
@@ -155,7 +172,7 @@
 
     async function refreshTask() {
       try {
-        await maybeRefresh();
+        await refresh();
       } catch (e) {
         Log.error(e);
       }
@@ -316,7 +333,7 @@
         </div>
         <div class="cfa-container">
           {{#each achievements}}
-            {{> achievement_template }}
+            {{> achievement_template}}
           {{/each}}
         </div>
       </div>
@@ -346,25 +363,26 @@
 
     const DIFFS_TEMPLATE = Handlebars.compile(`
       <div class="cfa-ach-popup-container">
+        {{#if added}}
         <div class="cfa-popup-heading-container">
           <div class="cfa-heading">Achievements added</div>
         </div>
         {{#each added}}
-          {{> achievement_template }}
+          {{> achievement_template}}
         {{/each}}
+        {{/if}}
+        {{#if removed}}
         <div class="cfa-popup-heading-container">
           <div class="cfa-heading">Achievements removed</div>
         </div>
         {{#each removed}}
-          {{> achievement_template }}
+          {{> achievement_template}}
         {{/each}}
+        {{/if}}
       </div>
     `);
 
-    const handle = document.querySelector('.info .rated-user').textContent.trim();
-    const details = await fetchAchievements(handle);
-
-    function createTemplateContexts(ach, clickable=true) {
+    function createTemplateContexts(ach, clickable = true) {
       const users_awarded_percent = (ach.users_awarded_fraction * 100).toFixed(2);
       const show_mul = ach.grant_infos.length > 1;
       const mul = ach.grant_infos.length;
@@ -391,7 +409,7 @@
       };
     }
 
-    function showAchievementsBox() {
+    function showAchievementsBox(details) {
       // Rarer achievements first
       details.achievements.sort((a, b) => a.users_awarded - b.users_awarded);
 
@@ -417,16 +435,10 @@
       document.querySelector('#pageContent').appendChild(el);
     }
 
-    async function maybeShowUpdatesForLoggedInUser() {
-      if (!loggedInUser || handle !== loggedInUser) {
-        return;
-      }
+    async function showDiffsForLoggedInUser(details) {
       const current = await Storage.currentAchievements.get();
-      if (!current) {
-        // No achievements saved, first time.
-        await Storage.currentAchievements.set(details);
-        return;
-      }
+      assert(current);
+
       const diffs = calculateDiffs(current.achievements, details.achievements);
       if (!diffs.changed) {
         Log.debug('Achievements not changed');
@@ -451,20 +463,38 @@
         const rendered = DIFFS_TEMPLATE(diffsForTemplate);
         showInFacebox(rendered);
         if (!currentSaved) {
+          // TODO: What if achievements were updated again while this page was open
           await Storage.currentAchievements.set(details);
           currentSaved = true;
+          Log.info('Saved achievements as viewed');
         }
       });
     }
 
-    showAchievementsBox();
-    maybeShowUpdatesForLoggedInUser();
+    const handle = document.querySelector('.info .rated-user').textContent.trim();
+    let details;
+    if (handle === loggedInUser) {
+      await fetchPendingAchievementsForLoggedInUser();
+      details = await Storage.pendingAchievements.get();
+    } else {
+      details = await fetchAchievements(handle);
+    }
+
+    showAchievementsBox(details);
+    if (handle === loggedInUser) {
+      showDiffsForLoggedInUser(details);
+    }
   }
 
-  // TODO: Needs more work
-  maybeCacheForLoggedInUser();
+  // TODO: Needs more work?
+
+  await maintainLastLoggedInUser();
 
   if (/^\/profile/.test(location.pathname)) {
-    updateProfilePageWithAchievements();
+    await updateProfilePageWithAchievements();
+  }
+
+  if (loggedInUser) {
+    await setupRefreshForLoggedInUser();
   }
 })();
