@@ -21,12 +21,14 @@
     ? 'http://localhost:4908/ach/'
     : 'https://cfa-api.azurewebsites.net/api/ach/';
   const REFRESH_INTERVAL = LOCAL ? 60 * 1000 : 60 * 60 * 1000; // 1m / 1h
-  const wrap = log => (...args) => log('[cfa]', ...args);
-  const Log = {
-    debug: DEBUG ? wrap(console.debug) : () => {},
-    info: wrap(console.info),
-    error: wrap(console.error),
-  };
+  const Log = (() => {
+    const wrap = f => (...args) => f('[cfa]', ...args);
+    return {
+      debug: DEBUG ? wrap(console.debug) : () => {},
+      info: wrap(console.info),
+      error: wrap(console.error),
+    };
+  })();
 
   function assert(v) {
     if (!v) {
@@ -61,14 +63,19 @@
     });
   }
 
-  function getLoggedInUser() {
+  const loggedInUser = (() => {
     const el = document.querySelector('#header').querySelector('[href^="/profile"]');
     return el ? el.textContent : null;
-  }
-  const loggedInUser = getLoggedInUser();
+  })();
   Log.info('Logged in user:', loggedInUser);
 
-  function createStorage(keys) {
+  const Storage = (() => {
+    const keys = [
+      'loggedInUser',
+      'currentAchievements',
+      'pendingAchievements',
+      'lastUpdated',
+    ];
     const o = {};
     for (const key of keys) {
       o[key] = {
@@ -81,13 +88,7 @@
       };
     }
     return o;
-  }
-  const Storage = createStorage([
-    'loggedInUser',
-    'currentAchievements',
-    'pendingAchievements',
-    'lastUpdated',
-  ]);
+  })();
   Log.debug(Storage);
 
   function calculateDiffs(achsA, achsB) {
@@ -161,6 +162,8 @@
 
       const diffs = calculateDiffs(current.achievements, pending.achievements);
       if (diffs.changed) {
+        // TODO: Only show diff once
+        // TODO: Only show diff on visible page
         const currentTitles = current.achievements.map(ach => ach.title);
         const pendingTitles = pending.achievements.map(ach => ach.title);
         Log.info('Achievements updated', currentTitles, pendingTitles);
