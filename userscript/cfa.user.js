@@ -237,7 +237,6 @@
       align-items: center;
     }
     .cfa-ach-icon {
-      margin-right: 15px;
       border-radius: 5px;
     }
     .cfa-ach-icon-rare {
@@ -246,6 +245,9 @@
     .cfa-ach-icon-img {
       width: 60px;
       height: 60px;
+    }
+    .cfa-ach-info {
+      margin-left: 15px;
     }
     .cfa-ach-mul {
       background-color: #333;
@@ -260,7 +262,7 @@
     .cfa-ach-title-text {
       font-weight: bold;
     }
-    .cfa-ach-info {
+    .cfa-ach-brief {
       font-size: 12px;
     }
     .cfa-ach-popup-container {
@@ -311,8 +313,8 @@
                 {{/if}}
                 <span>({{users_awarded_percent}}%)</span>
               </div>
-              <div class="cfa-ach-info">
-                 {{brief}}
+              <div class="cfa-ach-brief">
+                {{brief}}
               </div>
             </div>
           </div>
