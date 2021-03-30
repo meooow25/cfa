@@ -189,6 +189,8 @@
     #cfa-root {
       padding: 1em;
       margin-top: 1em;
+
+      --rare-anim-duration: 3s;
     }
     .cfa-hidden {
       display: none;
@@ -222,7 +224,7 @@
       flex: 0 50%
     }
     .cfa-ach-container {
-      padding: 5px;
+      padding: 10px 8px;
       border-radius: 5px;
       transition: background 150ms;
     }
@@ -237,17 +239,62 @@
       align-items: center;
     }
     .cfa-ach-icon {
-      border-radius: 5px;
-    }
-    .cfa-ach-icon-rare {
-      box-shadow: 0 0 5px #f33;
-    }
-    .cfa-ach-icon-img {
       width: 60px;
       height: 60px;
+      border-radius: 2px;
+    }
+    .cfa-ach-icon-common {
+      box-shadow: 0 0 4px #aaa;
+    }
+    .cfa-ach-icon-rare {
+      box-shadow: 0 0 4px #f66;
+    }
+
+    /* rare animation */
+    .cfa-ach-icon-rare {
+      position: relative;
+    }
+    .cfa-icon-bar {
+      position: absolute;
+      top: -2px;
+      bottom: -2px;
+      left: -2px;
+      right: -2px;
+      background-image: linear-gradient(180deg, #f66 30%, transparent 50%);
+      background-repeat: no-repeat;
+      background-size: 2px 200%;
+      border-radius: 2px;
+      filter: drop-shadow(0 0 2px #f66);
+      animation: rare-anim var(--rare-anim-duration) linear infinite;
+    }
+    .cfa-top {
+      transform: rotate(90deg);
+      animation-delay: calc(-0.5 * var(--rare-anim-duration));
+    }
+    .cfa-right {
+      transform: rotate(180deg);
+      animation-delay: calc(-1 * var(--rare-anim-duration));
+    }
+    .cfa-bottom {
+      transform: rotate(270deg);
+      animation-delay: calc(-1.5 * var(--rare-anim-duration));
+    }
+    @keyframes rare-anim {
+      0% {
+        background-position: 0 -100%;
+      }
+      100% {
+        background-position: 0 100%;
+      }
+    }
+    /* rare animation end */
+
+    .cfa-ach-icon-img {
+      max-width: 100%;
+      max-height: 100%;
     }
     .cfa-ach-info {
-      margin-left: 15px;
+      margin-left: 18px;
     }
     .cfa-ach-mul {
       background-color: #333;
@@ -300,8 +347,12 @@
           <div class="cfa-ach-container-inner">
             {{#if is_rare}}
             <div class="cfa-ach-icon cfa-ach-icon-rare">
+              <div class="cfa-icon-bar cfa-left"></div>
+              <div class="cfa-icon-bar cfa-top"></div>
+              <div class="cfa-icon-bar cfa-right"></div>
+              <div class="cfa-icon-bar cfa-bottom"></div>
             {{else}}
-            <div class="cfa-ach-icon">
+            <div class="cfa-ach-icon cfa-ach-icon-common">
             {{/if}}
               <img class="cfa-ach-icon-img" src="{{{icon_url}}}" alt="icon">
             </div>
