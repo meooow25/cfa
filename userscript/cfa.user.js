@@ -224,7 +224,7 @@
       flex: 0 50%
     }
     .cfa-ach-container {
-      padding: 10px 8px;
+      padding: 10px;
       border-radius: 5px;
       transition: background 150ms;
     }
@@ -345,24 +345,30 @@
         <div class="cfa-ach-container">
         {{/if}}
           <div class="cfa-ach-container-inner">
-            {{#if is_rare}}
-            <div class="cfa-ach-icon cfa-ach-icon-rare">
-              <div class="cfa-icon-bar cfa-left"></div>
-              <div class="cfa-icon-bar cfa-top"></div>
-              <div class="cfa-icon-bar cfa-right"></div>
-              <div class="cfa-icon-bar cfa-bottom"></div>
-            {{else}}
-            <div class="cfa-ach-icon cfa-ach-icon-common">
-            {{/if}}
-              <img class="cfa-ach-icon-img" src="{{{icon_url}}}" alt="icon">
+            <div>
+              <!--
+                Not sure why but without this extra div the next div doesn't respect fixed width
+                for the first ach on zooming in.
+              -->
+              {{#if is_rare}}
+              <div class="cfa-ach-icon cfa-ach-icon-rare">
+                <div class="cfa-icon-bar cfa-left"></div>
+                <div class="cfa-icon-bar cfa-top"></div>
+                <div class="cfa-icon-bar cfa-right"></div>
+                <div class="cfa-icon-bar cfa-bottom"></div>
+              {{else}}
+              <div class="cfa-ach-icon cfa-ach-icon-common">
+              {{/if}}
+                <img class="cfa-ach-icon-img" src="{{{icon_url}}}" alt="icon">
+              </div>
             </div>
             <div class="cfa-ach-info">
               <div class="cfa-ach-title">
                 <span class="cfa-ach-title-text">{{title}}</span>
-                {{#if show_mul}}
+                {{#if mul}}
                 <span class="cfa-ach-mul">x{{mul}}</span>
                 {{/if}}
-                <span>({{users_awarded_percent}}%)</span>
+                <span>({{users_awarded_percent}})</span>
               </div>
               <div class="cfa-ach-brief">
                 {{brief}}
@@ -399,12 +405,12 @@
       <div class="cfa-ach-popup-container">
         <div class="cfa-ach-popup-title">
           <span class="cfa-ach-title-text">{{title}}</span>
-          {{#if show_mul}}
+          {{#if mul}}
           <span class="cfa-ach-mul">x{{mul}}</span>
           {{/if}}
         </div>
         <div class="cfa-ach-popup-user-stats">
-          Awarded to {{users_awarded}} users ({{users_awarded_percent}}%)
+          Awarded to {{users_awarded}} users ({{users_awarded_percent}})
         </div>
         <div class="cfa-ach-popup-ach-desc">
           {{description}}
@@ -439,15 +445,19 @@
     `);
 
     function createTemplateContexts(ach, clickable = true) {
-      const users_awarded_percent = (ach.users_awarded_fraction * 100).toFixed(2);
-      const show_mul = ach.grant_infos.length > 1;
-      const mul = ach.grant_infos.length;
+      const percent_opts = {style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2};
+      const users_awarded_percent =
+        ach.users_awarded_fraction.toLocaleString(undefined, percent_opts);
+      const users_awarded = ach.users_awarded.toLocaleString();
+      let mul = ach.grant_infos.length;
+      if (mul == 1) {
+        mul = null;  // Don't show multiplier for single grant
+      }
       return {
         standard: {
           is_rare: ach.users_awarded_fraction <= 0.001,
           icon_url: ach.icon_url,
           title: ach.title,
-          show_mul,
           mul,
           users_awarded_percent,
           brief: ach.brief,
@@ -455,9 +465,8 @@
         },
         detailed: {
           title: ach.title,
-          show_mul,
           mul,
-          users_awarded: ach.users_awarded,
+          users_awarded,
           users_awarded_percent,
           description: ach.description,
           grant_infos: ach.grant_infos,
